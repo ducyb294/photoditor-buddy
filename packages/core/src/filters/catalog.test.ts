@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ADJUSTMENT_BY_KEY, HSL_BANDS, defaultAdjustments } from '../adjustments/defaults';
 import { applyPreset, stackPreset } from '../adjustments/merge';
-import { FILTER_CATALOG, FILTER_CATEGORIES, filtersInCategory, findFilter } from './catalog';
+import {
+  FILTER_CATALOG,
+  FILTER_CATEGORIES,
+  filterEffect,
+  filtersInCategory,
+  findFilter,
+} from './catalog';
 import { buildRecipeLut } from './lutRecipes';
 
 describe('filter catalogue', () => {
@@ -37,9 +43,9 @@ describe('filter catalogue', () => {
   describe('Pastel Soft', () => {
     const filter = findFilter('pastel-pastel-soft');
 
-    it('is listed first in the Pastel category under its display name', () => {
+    it('is listed in the Pastel category under its display name, after the Dreamy filters', () => {
       expect(filter?.name).toBe('Pastel Soft');
-      expect(filtersInCategory('Pastel')[0]?.id).toBe('pastel-pastel-soft');
+      expect(filtersInCategory('Pastel')[2]?.id).toBe('pastel-pastel-soft');
     });
 
     it('intensity 0 returns the user adjustments untouched, for both blend modes', () => {
@@ -76,6 +82,63 @@ describe('filter catalogue', () => {
       expect(p.curves?.rgb).toBeDefined();
       expect(p.colorBalance?.midtones).toBeDefined();
     });
+  });
+
+  describe('Dreamy Pastel', () => {
+    const filter = findFilter('pastel-dreamy-pastel');
+
+    it('is the first filter of the Pastel category', () => {
+      expect(filter?.name).toBe('Dreamy Pastel');
+      expect(filtersInCategory('Pastel')[0]?.id).toBe('pastel-dreamy-pastel');
+    });
+
+    it('intensity 0 changes nothing: no adjustments and no effect', () => {
+      const base = defaultAdjustments();
+      base.saturation = 7;
+      expect(stackPreset(base, filter!.preset, 0)).toEqual(base);
+      expect(filterEffect(filter!, 0)).toBeNull();
+    });
+
+    it('grades the three tonal ranges separately and keeps highlights from clipping', () => {
+      const out = stackPreset(defaultAdjustments(), filter!.preset, 1);
+      const yAt = (x: number): number => out.curves.rgb.find((p) => p.x === x)!.y;
+      expect(yAt(0)).toBeGreaterThan(0.02); // lifted blacks
+      expect(yAt(0.5)).toBeGreaterThan(0.5); // brighter mid-tones
+      expect(yAt(0.875)).toBeLessThan(0.95); // upper end held back, so bright photos stay bright
+      expect(yAt(1)).toBeLessThan(1); // highlight roll-off, never clipped
+      for (let i = 1; i < out.curves.rgb.length; i++)
+        expect(out.curves.rgb[i]!.y).toBeGreaterThan(out.curves.rgb[i - 1]!.y);
+      // The lift is a smooth lift, not a kink: no step steeper than 2.5x the diagonal.
+      for (let i = 1; i < out.curves.rgb.length; i++) {
+        const dy = out.curves.rgb[i]!.y - out.curves.rgb[i - 1]!.y;
+        const dx = out.curves.rgb[i]!.x - out.curves.rgb[i - 1]!.x;
+        expect(dy / dx).toBeLessThan(2.5);
+      }
+      expect(out.highlights).toBeLessThan(0);
+      const { shadows, midtones } = out.colorBalance;
+      expect(midtones[0]).toBeGreaterThan(midtones[1]); // pink-magenta mid-tones (red over green)
+      expect(shadows[2]).toBeGreaterThan(shadows[0]); // lavender shadows (blue over red)
+      expect(out.saturation).toBeGreaterThan(-15); // muted, not drained
+      expect(out.exposure).toBeLessThanOrEqual(12); // no strong exposure push
+    });
+
+    it('carries a very light bloom that scales with intensity and never pierces a user effect', () => {
+      expect(filter!.effect?.id).toBe('bloom');
+      const full = filterEffect(filter!, 1)!;
+      expect(full.amount).toBeLessThanOrEqual(20);
+      expect(filterEffect(filter!, 0.5)!.amount).toBeCloseTo(full.amount / 2, 5);
+      expect(filterEffect(findFilter('pastel-pastel-soft')!, 1)).toBeNull();
+    });
+  });
+
+  it('Dreamy Pastel V1 keeps the document values and sits right after Dreamy Pastel', () => {
+    const v1 = findFilter('pastel-dreamy-pastel-v1')!;
+    expect(filtersInCategory('Pastel')[1]?.id).toBe('pastel-dreamy-pastel-v1');
+    expect(v1.preset.exposure).toBe(12.5);
+    expect(v1.preset.shadows).toBe(26);
+    expect(v1.preset.curves?.blue?.[0]).toEqual({ x: 0, y: 0.11 });
+    expect(Object.keys(v1.preset.hsl ?? {})).toHaveLength(8);
+    expect(stackPreset(defaultAdjustments(), v1.preset, 0)).toEqual(defaultAdjustments());
   });
 
   it('builds LUTs for every recipe and caches them', () => {

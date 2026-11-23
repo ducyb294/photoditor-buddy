@@ -1,5 +1,7 @@
 import type { AdjustmentPreset } from '../adjustments/merge';
-import type { FilterCategory, FilterDefinition, LutRecipe } from './types';
+import { defaultEffectSettings, type EffectSettings } from '../effects/catalog';
+import { clamp } from '../math/clamp';
+import type { FilterCategory, FilterDefinition, FilterEffect, LutRecipe } from './types';
 
 /**
  * Compact constructor used by the tables below. Ids are derived from category and name so
@@ -10,13 +12,28 @@ function f(
   name: string,
   preset: AdjustmentPreset,
   lut?: LutRecipe,
+  effect?: FilterEffect,
 ): FilterDefinition {
   const id = `${category}-${name}`
     .toLowerCase()
     .replace(/&/g, 'and')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
-  return lut ? { id, name, category, preset, lut } : { id, name, category, preset };
+  const def: FilterDefinition = { id, name, category, preset };
+  if (lut) def.lut = lut;
+  if (effect) def.effect = effect;
+  return def;
+}
+
+/**
+ * The effect a filter contributes at `intensity` (0..1), or null when it has none or the
+ * intensity is 0. Callers use it only when the user has not chosen an effect themselves.
+ */
+export function filterEffect(filter: FilterDefinition, intensity = 1): EffectSettings | null {
+  if (!filter.effect) return null;
+  const amount = filter.effect.amount * clamp(intensity, 0, 1);
+  if (amount <= 0) return null;
+  return { ...defaultEffectSettings(filter.effect.id), amount, param: filter.effect.param };
 }
 
 /** Shortcut for a split-toning block (highlight hue/sat, shadow hue/sat, balance). */
@@ -1066,6 +1083,138 @@ const NEON: FilterDefinition[] = [
 ];
 
 const PASTEL: FilterDefinition[] = [
+  /**
+   * Korean-selfie "dreamy" grade, fitted to a night-photo reference rather than guessed: the
+   * parameters were found by coordinate descent on this engine's own pipeline until the original
+   * matched the graded photo per luminance band (within a few levels), then constrained so the
+   * highlights roll off instead of clipping.
+   * What the reference does: a strong, smooth lift of shadows and mid-tones, with red lifted more
+   * than green (pink-magenta mid-tones) and blue slightly more in the shadows (lavender), neutral
+   * highlights that stop short of white, cool colours about 35% calmer, skin saturation almost
+   * untouched, no blur (sharpness unchanged) and a faint halo around bright lights, which is the
+   * `bloom` effect below. Soft Glow-style diffusion is deliberately left out: the measured halo
+   * is small.
+   * Two choices come from testing on other scenes, not from the reference: the lift lives in the
+   * tone curve (a global exposure push clipped bright photos) and the curve keeps its top below
+   * 1, and the bloom threshold is high (param 15) because a low one adds light to every broad
+   * bright area, which is invisible in a night photo and blows out a daytime one.
+   */
+  f(
+    'Pastel',
+    'Dreamy Pastel',
+    {
+      contrast: -4,
+      highlights: -15,
+      shadows: 6,
+      whites: 2,
+      blacks: 8,
+      temperature: -2,
+      tint: -2,
+      curves: {
+        rgb: [
+          { x: 0, y: 0.04 },
+          { x: 0.125, y: 0.17 },
+          { x: 0.25, y: 0.34 },
+          { x: 0.375, y: 0.55 },
+          { x: 0.5, y: 0.69 },
+          { x: 0.625, y: 0.79 },
+          { x: 0.75, y: 0.865 },
+          { x: 0.875, y: 0.915 },
+          { x: 1, y: 0.975 },
+        ],
+      },
+      colorBalance: { shadows: [4, -4, 10], midtones: [26, 0, 20], highlights: [-5, -6, -5] },
+      hsl: {
+        green: { saturation: -8 },
+        aqua: { saturation: -6 },
+        blue: { saturation: -6 },
+      },
+    },
+    undefined,
+    { id: 'bloom', amount: 10, param: 15 },
+  ),
+  /**
+   * The hand-written starting values from Dreamy_Pastel_Preset_V1.md, kept for side-by-side
+   * comparison with Dreamy Pastel. They were never measured against the reference photo, and on a
+   * night photo they lift the darks far more than the reference does (the lifts in Shadows,
+   * Blacks, Fade and the curve all stack). Mapping notes:
+   * - Exposure +0.25 EV is slider 12.5 (the shader scales exposure by 2 stops).
+   * - Colour grading maps to split toning for shadows and highlights; the midtone zone is
+   *   approximated with a mid-tone colour balance (330 deg, 8 -> [13, -13, 0]).
+   * - Not supported by the engine and therefore not part of this preset: per-zone luminance,
+   *   grading Blending, Soft Focus, Smooth Skin, and running Glow and Bloom together (the
+   *   engine has one effect at a time, so only Bloom is applied).
+   */
+  f(
+    'Pastel',
+    'Dreamy Pastel V1',
+    {
+      exposure: 12.5,
+      brightness: 6,
+      contrast: -18,
+      highlights: -28,
+      shadows: 26,
+      whites: 8,
+      blacks: 14,
+      temperature: 4,
+      tint: 7,
+      saturation: -12,
+      vibrance: 8,
+      fade: 14,
+      grain: 3,
+      vignette: -7,
+      sharpen: 8,
+      clarity: -12,
+      dehaze: -4,
+      denoise: 8,
+      curves: {
+        rgb: [
+          { x: 0, y: 0.08 },
+          { x: 0.15, y: 0.19 },
+          { x: 0.3, y: 0.34 },
+          { x: 0.5, y: 0.53 },
+          { x: 0.7, y: 0.74 },
+          { x: 0.85, y: 0.88 },
+          { x: 1, y: 0.97 },
+        ],
+        red: [
+          { x: 0, y: 0.03 },
+          { x: 0.25, y: 0.27 },
+          { x: 0.5, y: 0.54 },
+          { x: 0.75, y: 0.78 },
+          { x: 1, y: 1 },
+        ],
+        green: [
+          { x: 0, y: 0.04 },
+          { x: 0.25, y: 0.26 },
+          { x: 0.5, y: 0.51 },
+          { x: 0.75, y: 0.75 },
+          { x: 1, y: 0.98 },
+        ],
+        blue: [
+          { x: 0, y: 0.11 },
+          { x: 0.25, y: 0.29 },
+          { x: 0.5, y: 0.53 },
+          { x: 0.75, y: 0.76 },
+          { x: 1, y: 0.97 },
+        ],
+      },
+      splitToning: tone(35, 5, 225, 9, 8),
+      colorBalance: { midtones: [13, -13, 0] },
+      hsl: {
+        red: { hue: 3, saturation: -8, luminance: 5 },
+        orange: { hue: -3, saturation: -10, luminance: 12 },
+        yellow: { hue: -12, saturation: -24, luminance: 8 },
+        green: { hue: 18, saturation: -32, luminance: 12 },
+        aqua: { hue: -8, saturation: -20, luminance: 12 },
+        blue: { hue: -12, saturation: -24, luminance: 15 },
+        purple: { hue: 5, saturation: -10, luminance: 8 },
+        magenta: { hue: -5, saturation: -12, luminance: 10 },
+      },
+    },
+    undefined,
+    { id: 'bloom', amount: 5, param: 15 },
+  ),
   /**
    * Soft, slightly rosy and warm. Sliders are in this engine's units (not the percentages of a
    * phone editor): exposure 8 is about +0.16 EV (the shader scales it by 2 stops), temperature and

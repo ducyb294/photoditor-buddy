@@ -8,6 +8,7 @@ import {
   createZip,
   defaultAdjustments,
   exportFileName,
+  filterEffect,
   fitWithin,
   loadImageFromBlob,
   stackPreset,
@@ -81,7 +82,9 @@ export function BatchScreen() {
               ? { ...adjustments, lut: { id: activeFilter!.id, intensity: intensity * 100 } }
               : adjustments,
             lut,
-            effect: useTemplate && lookTemplate ? lookTemplate.effect : null,
+            effect:
+              (useTemplate && lookTemplate ? lookTemplate.effect : null) ??
+              (activeFilter ? filterEffect(activeFilter, intensity) : null),
             portrait: null,
           });
           const blob = await canvasToBlob(renderer.snapshot(), { format, quality: quality / 100 });

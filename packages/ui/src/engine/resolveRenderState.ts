@@ -3,10 +3,12 @@ import {
   buildPortraitMask,
   buildRecipeLut,
   buildReshapeField,
+  filterEffect,
   findFilter,
   stackPreset,
   type Adjustments,
   type DisplacementField,
+  type EffectSettings,
   type FaceLandmarks,
   type Lut3D,
   type PortraitRenderInput,
@@ -126,7 +128,14 @@ export function resolveRenderState(
   return {
     adjustments: withLut,
     lut,
-    effect: snapshot.effect,
+    effect: snapshot.effect ?? resolveFilterEffect(snapshot),
     portrait: portraitCache.resolve(snapshot, faces),
   };
+}
+
+/** The effect carried by the active filter (for example a light bloom), scaled by its intensity. */
+function resolveFilterEffect(snapshot: EditSnapshot): EffectSettings | null {
+  if (!snapshot.filter) return null;
+  const filter = findFilter(snapshot.filter.id);
+  return filter ? filterEffect(filter, snapshot.filter.intensity / 100) : null;
 }

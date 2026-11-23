@@ -5,6 +5,7 @@ import {
   buildRecipeLut,
   defaultAdjustments,
   filtersInCategory,
+  filterEffect,
   bitmapToCanvas,
   fitWithin,
   stackPreset,
@@ -165,7 +166,7 @@ function FilterThumb({
           ? { ...adjustments, lut: { id: filter!.id, intensity: 100 } }
           : adjustments,
         lut,
-        effect: null,
+        effect: filter ? filterEffect(filter, 1) : null,
         portrait: null,
       });
       canvas.width = THUMB;

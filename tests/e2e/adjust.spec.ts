@@ -79,6 +79,54 @@ test.describe('adjust, filters, effects', () => {
     expect(Math.sign(topAfter - bottomAfter)).toBe(Math.sign(topBefore - bottomBefore));
   });
 
+  test('Dreamy Pastel: first in Pastel, lifts the photo, adds no clipping, intensity 0 is the original', async ({
+    page,
+  }) => {
+    await openSample(page);
+    const original = await previewStats(page);
+    const clippedShare = (): Promise<number> =>
+      page.evaluate(() => {
+        const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="preview-canvas"]')!;
+        const scratch = document.createElement('canvas');
+        scratch.width = canvas.width;
+        scratch.height = canvas.height;
+        const ctx = scratch.getContext('2d')!;
+        ctx.drawImage(canvas, 0, 0);
+        const { data } = ctx.getImageData(0, 0, scratch.width, scratch.height);
+        let clipped = 0;
+        for (let i = 0; i < data.length; i += 4)
+          if (data[i]! > 253 && data[i + 1]! > 253 && data[i + 2]! > 253) clipped++;
+        return clipped / (data.length / 4);
+      });
+    const clippedBefore = await clippedShare();
+
+    await page.getByTestId('tool-filters').click();
+    await page.getByTestId('filter-category-Pastel').click();
+    // Dreamy Pastel is the first thumbnail after "Original".
+    await expect(page.getByTestId('filter-grid').locator('button').nth(1)).toHaveAttribute(
+      'data-testid',
+      'filter-pastel-dreamy-pastel',
+    );
+    await page.getByTestId('filter-pastel-dreamy-pastel').click();
+    await page.waitForTimeout(500);
+    const graded = await previewStats(page);
+    expect(graded.mean).toBeGreaterThan(original.mean); // lifted, but not a flat overlay:
+    expect(graded.checksum).not.toBe(original.checksum);
+    expect(await clippedShare()).toBeLessThanOrEqual(clippedBefore + 0.01);
+
+    // Intensity 0 returns the original exactly, including the filter's own bloom.
+    await page.evaluate(() => {
+      const w = window as unknown as {
+        __pb: { store: { getState: () => { commit: (p: unknown) => void } } };
+      };
+      w.__pb.store.getState().commit({ filter: { id: 'pastel-dreamy-pastel', intensity: 0 } });
+    });
+    await page.waitForTimeout(500);
+    const zero = await previewStats(page);
+    expect(zero.checksum).toBe(original.checksum);
+    expect(zero.mean).toBeCloseTo(original.mean, 5);
+  });
+
   test('filters: every category renders thumbnails, applying one changes pixels, strength works', async ({
     page,
   }) => {

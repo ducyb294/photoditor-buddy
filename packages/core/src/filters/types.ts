@@ -1,4 +1,5 @@
 import type { AdjustmentPreset } from '../adjustments/merge';
+import type { EffectId } from '../effects/catalog';
 
 /** Category names shown as tabs in the Filters panel. Order here is the order in the UI. */
 export type FilterCategory =
@@ -30,6 +31,17 @@ export type LutRecipe =
   | { kind: 'gradientMap'; stops: [string, string, string] }
   | { kind: 'crossProcess'; strength: number };
 
+/**
+ * A creative effect a filter brings along (for example a very light bloom). `amount` is the full
+ * strength at filter intensity 100 and is scaled down with the intensity slider. It only applies
+ * while the user has no effect of their own selected.
+ */
+export interface FilterEffect {
+  id: EffectId;
+  amount: number;
+  param: number;
+}
+
 /** One filter (a named look). Applying it means blending `preset` onto the current adjustments. */
 export interface FilterDefinition {
   id: string;
@@ -37,4 +49,5 @@ export interface FilterDefinition {
   category: FilterCategory;
   preset: AdjustmentPreset;
   lut?: LutRecipe;
+  effect?: FilterEffect;
 }
