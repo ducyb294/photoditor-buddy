@@ -56,14 +56,21 @@ body {
   touch-action: manipulation;
 }
 
-/* Hide scrollbars in horizontal chip rows but keep them scrollable. */
+/* Horizontal chip rows: a thin scrollbar so mouse users can see and drag the overflow. */
 .scroll-x {
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
   -webkit-overflow-scrolling: touch;
 }
-.scroll-x::-webkit-scrollbar {
-  display: none;
+/* Touch devices scroll by swipe, so keep the row clean there. */
+@media (hover: none) {
+  .scroll-x {
+    scrollbar-width: none;
+  }
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Range inputs: a neutral track with an accent thumb, usable with a thumb-sized touch target. */

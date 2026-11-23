@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 interface ChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
@@ -20,7 +20,29 @@ export function Chip({ active, icon, className = '', children, ...rest }: ChipPr
   );
 }
 
-/** Horizontal scrolling row of chips. */
+/**
+ * Horizontal scrolling row of chips.
+ * A mouse wheel only scrolls vertically, so wheel movement is turned into horizontal scrolling;
+ * without it the chips past the right edge are unreachable on desktop.
+ */
 export function ChipRow({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`scroll-x flex gap-2 py-1 -mx-1 px-1 ${className}`}>{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent): void => {
+      const canScroll = el.scrollWidth > el.clientWidth;
+      if (!canScroll || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    // Non-passive listener: React's onWheel is passive and cannot call preventDefault.
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+  return (
+    <div ref={ref} className={`scroll-x flex gap-2 py-1 -mx-1 px-1 ${className}`}>
+      {children}
+    </div>
+  );
 }
