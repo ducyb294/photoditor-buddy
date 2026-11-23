@@ -1066,6 +1066,46 @@ const NEON: FilterDefinition[] = [
 ];
 
 const PASTEL: FilterDefinition[] = [
+  /**
+   * Soft, slightly rosy and warm. Sliders are in this engine's units (not the percentages of a
+   * phone editor): exposure 8 is about +0.16 EV (the shader scales it by 2 stops), temperature and
+   * tint are 0.12 / 0.10 of a channel per 100. The rosy cast comes from a mid-tone colour balance
+   * and a light split tone rather than a global tint, and orange/yellow are desaturated a little
+   * so skin does not turn yellow. A gentle RGB curve lifts the black point and softens the top.
+   * Soft Glow is an effect in this engine, not a filter parameter, so it is not part of this preset.
+   */
+  f('Pastel', 'Pastel Soft', {
+    exposure: 8,
+    brightness: 5,
+    contrast: -12,
+    saturation: -10,
+    vibrance: -5,
+    temperature: 10,
+    tint: 6,
+    highlights: -15,
+    shadows: 18,
+    whites: 5,
+    blacks: 10,
+    fade: 8,
+    curves: {
+      rgb: [
+        { x: 0, y: 0.035 },
+        { x: 0.25, y: 0.265 },
+        { x: 0.5, y: 0.51 },
+        { x: 0.75, y: 0.765 },
+        { x: 1, y: 0.985 },
+      ],
+    },
+    colorBalance: { shadows: [3, -1, 3], midtones: [10, -3, 4] },
+    splitToning: tone(20, 6, 330, 6),
+    hsl: {
+      orange: { hue: -3, saturation: -6, luminance: 6 },
+      yellow: { saturation: -10 },
+      green: { saturation: -12, luminance: 4 },
+      aqua: { saturation: -8 },
+      blue: { saturation: -6, luminance: 4 },
+    },
+  }),
   f('Pastel', 'Cotton Candy', {
     exposure: 8,
     contrast: -14,

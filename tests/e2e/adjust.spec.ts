@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openSample, previewStats, setSlider, storeState } from './helpers';
+import { openSample, previewStats, regionLuminance, setSlider, storeState } from './helpers';
 
 test.describe('adjust, filters, effects', () => {
   test('exposure slider changes the picture and records undo', async ({ page }) => {
@@ -58,6 +58,25 @@ test.describe('adjust, filters, effects', () => {
     expect(inverted.checksum).not.toBe(mid.checksum);
     await page.getByTestId('auto-enhance').click();
     expect(await storeState<number>(page, 'snapshot.adjustments.vibrance')).toBeGreaterThan(0);
+  });
+
+  test('a filter that carries a tone curve keeps the photo on its first frame', async ({
+    page,
+  }) => {
+    await openSample(page);
+    const topBefore = await regionLuminance(page, 'preview-canvas', 0.5, 0.15);
+    const bottomBefore = await regionLuminance(page, 'preview-canvas', 0.5, 0.85);
+    expect(Math.abs(topBefore - bottomBefore)).toBeGreaterThan(8);
+    await page.getByTestId('tool-filters').click();
+    await page.getByTestId('filter-category-Pastel').click();
+    await page.getByTestId('filter-pastel-pastel-soft').click();
+    await page.waitForTimeout(400);
+    const topAfter = await regionLuminance(page, 'preview-canvas', 0.5, 0.15);
+    const bottomAfter = await regionLuminance(page, 'preview-canvas', 0.5, 0.85);
+    // The curve table used to replace the photo for that frame, leaving a pure left-right ramp
+    // where top and bottom read the same.
+    expect(Math.abs(topAfter - bottomAfter)).toBeGreaterThan(5);
+    expect(Math.sign(topAfter - bottomAfter)).toBe(Math.sign(topBefore - bottomBefore));
   });
 
   test('filters: every category renders thumbnails, applying one changes pixels, strength works', async ({
