@@ -32,6 +32,8 @@ export function applyPreset(
 ): Adjustments {
   const t = clamp(intensity, 0, 1);
   const out = cloneAdjustments(base);
+  // Same guarantee as `stackPreset`: zero intensity leaves `base` exactly as it was.
+  if (t === 0) return out;
   const mix = (a: number, b: number): number => a + (b - a) * t;
 
   for (const key of Object.keys(preset) as (keyof AdjustmentPreset)[]) {
@@ -121,6 +123,9 @@ export function stackPreset(
 ): Adjustments {
   const t = clamp(intensity, 0, 1);
   const out = cloneAdjustments(base);
+  // Intensity 0 must be a true no-op: hue picks, curve points and LUT ids below are assigned
+  // rather than blended, so they would otherwise replace the user's own values even at 0.
+  if (t === 0) return out;
   const add = (key: ScalarAdjustmentKey, value: number): void => {
     const def = ADJUSTMENT_BY_KEY[key];
     const neutral = def.defaultValue;

@@ -328,8 +328,10 @@ export class Renderer {
     const { gl } = this;
     const p = this.programs.color;
     this.begin(p, out);
-    bindTextureUnit(gl, p, 'u_image', input, 0);
     // Curves: rebuild the 256-entry tables only when the curve points change.
+    // This must run BEFORE the image is bound: `updateCurveTexture` binds on whatever texture
+    // unit is active, so with the image already on unit 0 the curve table replaced the photo
+    // for the frame in which the curve changed (the preview showed a bare gradient).
     const useCurve = !(
       isIdentityCurve(a.curves.rgb) &&
       isIdentityCurve(a.curves.red) &&
@@ -356,6 +358,7 @@ export class Renderer {
         this.curveKey = key;
       }
     }
+    bindTextureUnit(gl, p, 'u_image', input, 0);
     bindTextureUnit(gl, p, 'u_curve', this.curveTexture, 1);
     gl.uniform1f(this.loc(p, 'u_useCurve'), useCurve ? 1 : 0);
     // LUT.
